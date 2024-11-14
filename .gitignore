@@ -1,5 +1,10 @@
-config
-venv 
-main
-ozbekbot
-test1
+# Исключение конфигурационного файла
+config.py
+
+# Исключение виртуального окружения
+venv/
+
+# Исключение определённых Python файлов
+main.py
+ozbekbot.py
+test1.py
