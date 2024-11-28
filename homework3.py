@@ -92,17 +92,17 @@ async def command_adidas(message: types.Message):
     await message.answer(info_adidas)
     await message.answer('Цена на данную модель состовляет: 77$')
     
-@dp.message(F.text == '')
-async def command_kobe(message: types.Message):
-    await message.reply_photo(photo='')
-    await message.answer(inf)
-    await message.answer('Цена на данную модель состовляет: ')
+# @dp.message(F.text == '')
+# async def command_kobe(message: types.Message):
+#     await message.reply_photo(photo='')
+#     await message.answer(inf)
+#     await message.answer('Цена на данную модель состовляет: ')
     
-@dp.message(F.text == '')
-async def command_kobe(message: types.Message):
-    await message.reply_photo(photo='')
-    await message.answer(info_adidas)
-    await message.answer('Цена на данную модель состовляет: ')
+# @dp.message(F.text == '')
+# async def command_kobe(message: types.Message):
+#     await message.reply_photo(photo='')
+#     await message.answer(info_adidas)
+#     await message.answer('Цена на данную модель состовляет: ')
 
 
 
@@ -119,7 +119,7 @@ async def command_asics(message: types.Message):
     
 @dp.message(F.text == 'ASICS Gel-1130')
 async def command_asics(message: types.Message):
-    await message.reply_photo(photo=)
+    # await message.reply_photo(photo=)
     await message.answer()
     await message.answer('Цена на данную модель состовляет: ') 
 
