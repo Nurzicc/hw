@@ -2,7 +2,7 @@
 # from aiogram import Bot, Dispatcher, types, F
 # from aiogram.filters import CommandStart, Command
 # from aiogram.types import ReplyKeyboardMarkup , KeyboardButton
-# from config import token
+# from homework77.config import token
 
 # #ReplyKeyboardMarkup - Собирает клавиатуру
 
