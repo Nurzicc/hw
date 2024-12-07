@@ -1,188 +1,214 @@
-# import sqlite3
-# import random
-# import string
 # import logging
-# from datetime import datetime
-# from aiogram import Bot, Dispatcher, F, types
-# from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-# from aiogram.filters import Command
-# from aiogram.fsm.state import State, StatesGroup
-# from aiogram.fsm.context import FSMContext
-# from aiogram.fsm.storage.memory import MemoryStorage
-# from config import token
+# import asyncio
+# import sqlite3
 
-# # Настройка логирования
-# logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-# logger = logging.getLogger(__name__)
+# from aiogram import Bot, Dispatcher, types, F
+# from aiogram.types import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+# from aiogram.filters import CommandStart
+# from aiogram import Router
 
-# # Инициализация бота и базы данных
-# bot = Bot(token=token)
-# dp = Dispatcher(storage=MemoryStorage())
+# # Инициализация
+# router = Router()
+# bot = Bot(token='7839930317:AAFnKEP-rraQdaEZ8M0LZMS21qW4D8YYxWE')
+# dp = Dispatcher()
 
-# conn = sqlite3.connect("visa_card.db", check_same_thread=False)
-# cursor = conn.cursor()
+# # Команды бота
+# command = [BotCommand(command="start", description="Начать")]
 
-# # Создание таблицы для хранения данных пользователей
-# cursor.execute("""
+# # Кнопки
+# buttons = [
+#     [KeyboardButton(text="Добавить задачу"), KeyboardButton(text="Показать задачи")],
+#     [KeyboardButton(text="Очистить список")],
+# ]
+# keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, input_field_placeholder="Выберите кнопку")
+
+# inline_button = [
+#     [InlineKeyboardButton(text="Подтвердить", callback_data="confirm_clear")],
+#     [InlineKeyboardButton(text="Отменить", callback_data="cancel_clear")],
+# ]
+# inline_keyboard = InlineKeyboardMarkup(inline_keyboard=inline_button)
+
+# # База данных
+# connect = sqlite3.connect("to_do_list.db")
+# cursor = connect.cursor()
+
+# cursor.execute(
+#     """
 # CREATE TABLE IF NOT EXISTS users (
-#     user_id INTEGER PRIMARY KEY,
-#     name TEXT,
-#     surname TEXT,
-#     passport TEXT,
-#     email TEXT,
-#     password TEXT,
-#     registration_date TEXT
+#     id INTEGER PRIMARY KEY AUTOINCREMENT,
+#     telegram_user INTEGER UNIQUE
 # )
-# """)
-# conn.commit()
+# """
+# )
 
-# # Машина состояний для регистрации
-# class RegistrationState(StatesGroup):
-#     waiting_for_name = State()
-#     waiting_for_surname = State()
-#     waiting_for_passport = State()
-#     waiting_for_email = State()
+# cursor.execute(
+#     """
+# CREATE TABLE IF NOT EXISTS tasks (
+#     id INTEGER PRIMARY KEY AUTOINCREMENT,
+#     task TEXT,
+#     user_id INTEGER,
+#     FOREIGN KEY (user_id) REFERENCES users (id)
+# )
+# """
+# )
+# connect.commit()
 
-# # Функция для генерации пароля
-# def generate_password(length=8):
-#     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+# def register_user(telegram_user):
+#     cursor.execute("INSERT OR IGNORE INTO users (telegram_user) VALUES (?)", (telegram_user,))
+#     connect.commit()
 
-# # Главное меню
-# def main_menu():
-#     return InlineKeyboardMarkup(inline_keyboard=[
-#         [InlineKeyboardButton(text="📋 Регистрация", callback_data="start_registration")],
-#         [InlineKeyboardButton(text="👤 Личный кабинет", callback_data="profile")],
-#         [InlineKeyboardButton(text="ℹ️ Команды", callback_data="help")]
-#     ])
+# def add_task(telegram_user, task):
+#     cursor.execute("SELECT id FROM users WHERE telegram_user = ?", (telegram_user,))
+#     user_id = cursor.fetchone()
+#     if user_id:
+#         cursor.execute("INSERT INTO tasks (task, user_id) VALUES (?, ?)", (task, user_id[0]))
+#         connect.commit()
 
-# # Кнопка "Назад"
-# def back_button():
-#     return InlineKeyboardMarkup(inline_keyboard=[
-#         [InlineKeyboardButton(text="⬅️ Назад", callback_data="cancel_registration")]
-#     ])
-
-# # Обработчик команды /start
-# @dp.message(Command("start"))
-# async def start_command(message: types.Message):
-#     logger.info(f"Пользователь {message.from_user.id} запустил бота")
-#     await message.answer(
-#         "👋 Добро пожаловать в систему Visa Card!\n"
-#         "Выберите действие или используйте команды:\n"
-#         "/start - Запуск бота\n"
-#         "/help - Список доступных команд",
-#         reply_markup=main_menu()
+# def get_tasks(telegram_user):
+#     cursor.execute(
+#         """
+#         SELECT tasks.id, tasks.task 
+#         FROM tasks 
+#         JOIN users ON tasks.user_id = users.id 
+#         WHERE users.telegram_user = ?
+#         """,
+#         (telegram_user,),
 #     )
+#     return cursor.fetchall()
 
-# # Обработчик команды /help
-# @dp.message(Command("help"))
-# async def help_command(message: types.Message):
-#     logger.info(f"Пользователь {message.from_user.id} запросил справку")
-#     await message.answer(
-#         "ℹ️ Список доступных команд:\n"
-#         "/start - Запуск бота\n"
-#         "/help - Список команд\n"
-#         "📋 Регистрация - Заполните свои данные.\n"
-#         "👤 Личный кабинет - Просмотр ваших данных.",
-#         reply_markup=main_menu()
+# def delete_all_tasks(telegram_user):
+#     cursor.execute(
+#         """
+#         DELETE FROM tasks WHERE user_id = (
+#             SELECT id FROM users WHERE telegram_user = ?
+#         )
+#         """,
+#         (telegram_user,),
 #     )
+#     connect.commit()
 
-# # Начало регистрации
-# @dp.callback_query(lambda c: c.data == "start_registration")
-# async def start_registration(callback: types.CallbackQuery, state: FSMContext):
-#     logger.info(f"Пользователь {callback.from_user.id} начал регистрацию")
-#     await callback.message.edit_text("Введите ваше имя:", reply_markup=back_button())
-#     await state.set_state(RegistrationState.waiting_for_name)
+# def tasks_buttons(tasks):
+#     markup = InlineKeyboardMarkup()
+#     for task_id, task_text in tasks:
+#         button_text = " ".join(task_text.split()[:2])
+#         markup.add(InlineKeyboardButton(text=button_text, callback_data=f"task_{task_id}"))
+#     return markup
 
-# # Ввод имени
-# @dp.message(F.state == RegistrationState.waiting_for_name)
-# async def enter_name(message: types.Message, state: FSMContext):
-#     if not message.text or len(message.text.strip()) < 2:
-#         await message.answer("❗ Пожалуйста, введите корректное имя (не менее 2 символов).")
-#         return
-#     await state.update_data(name=message.text.strip())
-#     logger.info(f"Пользователь {message.from_user.id} ввёл имя: {message.text}")
-#     await message.answer("Введите вашу фамилию:", reply_markup=back_button())
-#     await state.set_state(RegistrationState.waiting_for_surname)
+# @router.message(CommandStart())
+# async def command_start(message: types.Message):
+#     register_user(message.from_user.id)
+#     await message.answer(f"Привет, {message.from_user.first_name}!", reply_markup=keyboard)
 
-# # Ввод фамилии
-# @dp.message(F.state == RegistrationState.waiting_for_surname)
-# async def enter_surname(message: types.Message, state: FSMContext):
-#     if not message.text or len(message.text.strip()) < 2:
-#         await message.answer("❗ Пожалуйста, введите корректную фамилию (не менее 2 символов).")
-#         return
-#     await state.update_data(surname=message.text.strip())
-#     logger.info(f"Пользователь {message.from_user.id} ввёл фамилию: {message.text}")
-#     await message.answer("Введите номер вашего паспорта:", reply_markup=back_button())
-#     await state.set_state(RegistrationState.waiting_for_passport)
+# @router.message(F.text == "Добавить задачу")
+# async def ask_task(message: types.Message):
+#     await message.answer("Введите содержание задачи:")
 
-# # Ввод номера паспорта
-# @dp.message(F.state == RegistrationState.waiting_for_passport)
-# async def enter_passport(message: types.Message, state: FSMContext):
-#     if not message.text or not message.text.strip().isdigit():
-#         await message.answer("❗ Пожалуйста, введите корректный номер паспорта (только цифры).")
-#         return
-#     await state.update_data(passport=message.text.strip())
-#     logger.info(f"Пользователь {message.from_user.id} ввёл номер паспорта: {message.text}")
-#     await message.answer("Введите ваш EMAIL:", reply_markup=back_button())
-#     await state.set_state(RegistrationState.waiting_for_email)
+# @router.message(lambda msg: msg.text not in ["Добавить задачу", "Показать задачи", "Очистить список"])
+# async def save_task(message: types.Message):
+#     add_task(message.from_user.id, message.text)
+#     await message.answer("Задача добавлена!", reply_markup=keyboard)
 
-# # Ввод email
-# @dp.message(F.state == RegistrationState.waiting_for_email)
-# async def enter_email(message: types.Message, state: FSMContext):
-#     if "@" not in message.text or "." not in message.text:
-#         await message.answer("❗ Пожалуйста, введите корректный EMAIL.")
-#         return
-#     user_data = await state.get_data()
-#     user_data['email'] = message.text.strip()
-#     user_data['password'] = generate_password()
-#     user_data['registration_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-#     cursor.execute("""
-#     INSERT INTO users (user_id, name, surname, passport, email, password, registration_date) 
-#     VALUES (?, ?, ?, ?, ?, ?, ?)
-#     """, (message.from_user.id, user_data['name'], user_data['surname'], user_data['passport'],
-#           user_data['email'], user_data['password'], user_data['registration_date']))
-#     conn.commit()
-
-#     logger.info(f"Пользователь {message.from_user.id} завершил регистрацию: {user_data}")
-#     await message.answer(
-#         f"✅ Регистрация завершена!\nВаш пароль: {user_data['password']}\n"
-#         "Вы можете использовать его для входа в личный кабинет.",
-#         reply_markup=main_menu()
-#     )
-#     await state.clear()
-
-# # Обработчик кнопки "Назад"
-# @dp.callback_query(lambda c: c.data == "cancel_registration")
-# async def cancel_registration(callback: types.CallbackQuery, state: FSMContext):
-#     logger.info(f"Пользователь {callback.from_user.id} отменил регистрацию")
-#     await state.clear()
-#     await callback.message.edit_text("❌ Регистрация отменена. Выберите действие:", reply_markup=main_menu())
-
-# # Личный кабинет
-# @dp.callback_query(lambda c: c.data == "profile")
-# async def view_profile(callback: types.CallbackQuery):
-#     cursor.execute("SELECT name, surname, passport, email, registration_date FROM users WHERE user_id = ?", (callback.from_user.id,))
-#     user = cursor.fetchone()
-#     if user:
-#         profile_text = (f"👤 Ваши данные:\n"
-#                         f"Имя: {user[0]}\n"
-#                         f"Фамилия: {user[1]}\n"
-#                         f"Номер паспорта: {user[2]}\n"
-#                         f"EMAIL: {user[3]}\n"
-#                         f"Дата регистрации: {user[4]}")
-#         logger.info(f"Пользователь {callback.from_user.id} просмотрел профиль")
-#         await callback.message.edit_text(profile_text, reply_markup=main_menu())
+# @router.message(F.text == "Показать задачи")
+# async def show_tasks(message: types.Message):
+#     tasks = get_tasks(message.from_user.id)
+#     if tasks:
+#         await message.answer("Ваши задачи:", reply_markup=tasks_buttons(tasks))
 #     else:
-#         logger.info(f"Пользователь {callback.from_user.id} попытался зайти в профиль без регистрации")
-#         await callback.message.edit_text("❌ Вы ещё не зарегистрированы.", reply_markup=main_menu())
+#         await message.answer("Список задач пуст.")
+
+# @router.message(F.text == "Очистить список")
+# async def confirm_clear_list(message: types.Message):
+#     await message.answer("Вы уверены?", reply_markup=inline_keyboard)
+
+# @router.callback_query(F.data == "confirm_clear")
+# async def clear_tasks(callback: types.CallbackQuery):
+#     delete_all_tasks(callback.from_user.id)
+#     await callback.message.edit_text("Список задач очищен.")
+
+# @router.callback_query(F.data == "cancel_clear")
+# async def cancel_clear(callback: types.CallbackQuery):
+#     await callback.message.edit_text("Очистка отменена.")
 
 # async def main():
-#     try:
-#         await dp.start_polling(bot)
-#     finally:
-#         await bot.session.close()
+#     logging.basicConfig(level=logging.INFO)
+#     dp.include_router(router)
+#     await bot.set_my_commands(command)
+#     await dp.start_polling(bot)
 
-# if __name__ == "__main__":
-#     import asyncio
+# try:
 #     asyncio.run(main())
+# except KeyboardInterrupt:
+#     print("Выход")
+
+import asyncio 
+from aiogram import Bot, Dispatcher, Router, F, types  # Импортируем необходимые модули aiogram
+from aiogram.types import CallbackQuery, KeyboardButton, ReplyKeyboardMarkup  # Работа с клавиатурой
+from aiogram.filters import Command  # Для обработки команды /start
+from aiogram.fsm.context import FSMContext  # Контекст FSM (Finite State Machine)
+from aiogram.fsm.state import State, StatesGroup  # Определение состояний
+from aiogram.fsm.storage.memory import MemoryStorage  # Используем хранилище в памяти
+import logging  # Для логирования
+
+logging.basicConfig(level=logging.INFO)  # Настраиваем логирование
+buttons = [  # Определяем кнопки для клавиатуры
+    [KeyboardButton(text='Подтвердить'), KeyboardButton(text='Отменить')]
+]
+
+keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)  # Создаём клавиатуру
+
+storage = MemoryStorage()  # Инициализируем хранилище для состояний
+dp = Dispatcher(storage=storage)  # Создаём диспетчер и связываем его с хранилищем
+bot = Bot(token='7839930317:AAFnKEP-rraQdaEZ8M0LZMS21qW4D8YYxWE')  # Создаём объект бота с токеном
+
+
+class Data(StatesGroup):  # Определяем группу состояний для работы с заметками
+    waiting_for_note_date = State()  # Состояние ожидания заголовка заметки
+    waiting_for_note_content = State()  # Состояние ожидания содержимого заметки
+    
+@dp.message(Command('start'))  # Обработчик команды /start
+async def startt(message: types.Message, state: FSMContext):
+    first_name = message.from_user.first_name  # Получаем имя пользователя
+    await message.answer(f'Привет, {first_name}!\n\n Введи заголовок заметки:')  # Отправляем приветственное сообщение
+    await state.set_state(Data.waiting_for_note_date)  # Переводим пользователя в состояние ожидания заголовка заметки
+    
+@dp.message(Data.waiting_for_note_date)  # Обработчик ввода заголовка заметки
+async def set_note_title(message: types.Message, state: FSMContext):
+    await message.answer('Введи содержимое заметки:')  # Просим ввести содержимое заметки
+    await state.update_data(note_title=message.text)  # Сохраняем заголовок заметки в состояние
+    await state.set_state(Data.waiting_for_note_content)  # Переводим пользователя в состояние ожидания содержимого заметки
+
+@dp.message(Data.waiting_for_note_content)  # Обработчик ввода содержимого заметки
+async def set_note_content(message: types.Message, state: FSMContext):
+    await state.update_data(note_content=message.text)  # Сохраняем содержимое заметки в состояние
+    user_data = await state.get_data()  # Извлекаем все данные из состояния
+    note_title = user_data.get('note_title')  # Получаем заголовок заметки
+    note_content = user_data.get('note_content')  # Получаем содержимое заметки
+    
+    await message.answer(  # Отправляем пользователю сообщение с кнопками подтверждения или отмены
+        f'Подтвердите сохранение заметки:\n\nЗаголовок: {note_title}\nСодержимое: {note_content}',
+        reply_markup=keyboard  # Клавиатура с кнопками
+    )
+    
+@dp.message(F.text == 'Подтвердить')  # Обработчик нажатия кнопки "Подтвердить"
+async def confirm(message: types.Message, state: FSMContext):
+    data = await state.get_data()  # Извлекаем данные из состояния
+    note_title = data.get('note_title')  # Получаем заголовок заметки
+    note_content = data.get('note_content')  # Получаем содержимое заметки
+
+    await message.answer(  # Подтверждаем сохранение заметки
+        f'Заметка сохранена:\n\nЗаголовок: {note_title}\nСодержимое: {note_content}'
+    )
+    await state.clear()  # Очищаем состояние после сохранения
+
+@dp.message(F.text == 'Отменить')  # Обработчик нажатия кнопки "Отменить"
+async def cancel(message: types.Message, state: FSMContext):
+    await message.answer('Заметка удалена.')  # Сообщаем об отмене
+    await state.clear()  # Очищаем состояние
+
+async def main():  # Основная функция для запуска бота
+    await dp.start_polling(bot)  # Запускаем long polling
+
+if __name__ == '__main__':  # Точка входа в программу
+    asyncio.run(main())  # Запускаем бота
+
+
